@@ -1,0 +1,156 @@
+Datenträger partitionieren
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+##developer:  Daan de Dios
+##date:       2019-02.27
+##aufgabe:    partitionieren
+
+##Vorbereitung
+    Bei physischen Servern sind oft zwei schnelle Festplatten in einem RAID Verbund für das System reserviert. Vielfach ist es aber der Fall, dass weitere Festplatten eingebaut werden, welche einzeln oder   auch wieder in einem Verbund betrieben werden.
+
+##Aufgabenstellung
+    Bei neuen Servern darf oft der Speicherplatz erweitert werden. Das ist bei einem Fileserver z.B. oft der Fall, wo dann mehrere Festplatten separat oder in einem Verbund eingebunden werden. Jedenfalls muss   eine Festplatte vor der Verwendung vor allem partitioniert werden, damit das Dateisystem eingerichtet werden kann. In unserem Beispiel nehmen wir an, dass der neu hinzugefügte Datenträger unsere neu zu      partitionierende Festplatte ist. Dokumentieren Sie diesen Auftrag gründlich. Sie können die bisher geführte Dokumentation verwenden.
+
+
+
+# Aufgaben
+--------------------------------------------------------
+
+1. Erweitern Sie ihren virtuellen Computer um eine neue virtuelle Festplatte mit mindestens 10GB Kapazität
+Verwenden Sie SCSI Tools [/sbin/rescan-scsi-bus] um die Festplatten neu einzulesen 
+-------------------------------------------------------------------------------------------------------------------
+>> add HDD vmPlayer
+apt install scsitools
+/sbin/rescan-scsi-bus 
+-------------------------------------------------------------------------------------------------------------------
+
+
+2. Prüfen Sie nach dem Neustart ob die hinzugefügte Festplatte erkannt worden ist, leiten Sie die Ausgabe in die Datei hardware.txt um
+Mit Befehlen wie grep oder ls geht es relativ schnell
+-------------------------------------------------------------------------------------------------------------------
+fdisk -l >> /home/daan/hardware.txt
+oder
+ls -ls /dev/sd* >> /home/daan/hardware.txt
+oder
+ls -l /dev | grep sdb* > /home/hardware.txt 
+-------------------------------------------------------------------------------------------------------------------
+
+
+3. Starten Sie fdisk auf der neuen Festplatte und erstellen Sie eine primäre EXT4 Partition mit dem gesamt verfügbaren Speicherplatz
+Alle fdisk-Fragen können Sie mit Enter bestätigen und damit die vorgeschlagenen Standards akzeptieren.
+-------------------------------------------------------------------------------------------------------------------
+#partitionieren
+fdisk /dev/sdb
+m       --> menu
+n       --> neue partition
+p       --> primär
+1       --> partition platz
+2048    --> erster freier platz
+<enter> --> für alles
+y       --> bestätigen
+w       --> write
+
+#Formatierung
+mkfs.ext4 /dev/sdb1
+lsblk
+-------------------------------------------------------------------------------------------------------------------
+
+
+4. Binden Sie die neue Partition einmalig unter /mnt/vorname ein
+Wenn Sie hier eine Fehlermeldung bekommen, haben Sie möglicherweise das Dateisystem nicht korrekt eingerichtet [mkfs]
+-------------------------------------------------------------------------------------------------------------------
+mkdir /mnt/daan -p
+mount /dev/sdb1 /mnt/daan/
+df -h /mnt/daan/
+-------------------------------------------------------------------------------------------------------------------
+
+
+5. Die neue Partition soll beim Neustart automatisch unter /mnt/vorname eingehängt werden
+Starten Sie die VM erst neu, wenn Sie die neue Konfiguration mit [mount -a] getestet haben
+-------------------------------------------------------------------------------------------------------------------
+nano /etc/fstab
+
+# <file system>   <mount point>   <type>   <options>     <dump>  <pass>
+>> /dev/sdb1       /mnt/daan       ext4    defaults        0       1
+
+reboot
+
+lsblk
+oder
+df -Th /mnt/daan/
+-------------------------------------------------------------------------------------------------------------------
+
+
+6. Kopieren Sie zum Schluss das /etc/ Konfigurationsverzeichnis auf die neue Partition. Verwenden Sie den Namen etc.tar.gz
+Hierzu gibt es verschiedene und Tools. Mit [df -h] kann geprüft werden, ob die Partition eingebunden und verwendet wird.
+-------------------------------------------------------------------------------------------------------------------
+tar -zcvf /mnt/daan/etc.tar.gz /etc
+df -Th /mnt/daan/
+-------------------------------------------------------------------------------------------------------------------
+
+
+7. Erstellen Sie eine neue DOS oder GPT Partitionstabelle auf dem Datenträger
+Mit [fdisk] können Sie eine neue Partitionstabelle auf dem Datenträger erstellen und bestehendes Layout überschreiben
+-------------------------------------------------------------------------------------------------------------------
+nano /etc/fstab
+Löschen -->>> /dev/sdb1       /mnt/daan       ext4    defaults        0       1
+
+fdisk /dev/sdb
+g --> create a new empty GPT partition table
+w --> write
+reboot
+-------------------------------------------------------------------------------------------------------------------
+
+
+8. Erstellen Sie nun eine primäre Partition mit 50% der verfügbaren Speicherkapazität
+Diese Partition soll beim Neustart automatisch unter [/mnt/storage] eingehängt werden
+-------------------------------------------------------------------------------------------------------------------
+fdsik /dev/sdb
+n --> newe partition
+1
+2048
++128G
+Y
+W
+
+mkfs.ext4 /dev/sdb1
+mkdir /mnt/storage
+mount /dev/sdb1 /mnt/storage/
+
+nano /etc/fstab
+
+# <file system>   <mount point>   <type>   <options>     <dump>  <pass>
+>> /dev/sdb1       /mnt/storage       ext4    defaults        0       2
+
+tar -zcvf /mnt/storage/backup.etc.tar.gz /etc
+-------------------------------------------------------------------------------------------------------------------
+
+
+9. Erstellen Sie eine weitere erweiterte/logische Partition mit den restlichen 50% der verfügbaren Speicherkapazität
+Diese Partition soll beim Neustart automatisch unter [/home/dein-user-home/filebox] eingehängt werden
+-------------------------------------------------------------------------------------------------------------------
+fdisk /dev/sdb
+n
+2
+<enter>
+<enter>
+w
+
+mkfs.ext4 /dev/sdb2
+mkdir /home/daan/filebox -p
+
+# <file system>   <mount point>        <type>   <options>     <dump>  <pass>
+>> /dev/sdb2       /home/daan/filebox   ext4    defaults        0       2
+mount -a
+lsblk
+-------------------------------------------------------------------------------------------------------------------
+
+
+10. Laden Sie die aktuelle Dokumentation inkl. Partitionierung als Abgabe hoch
+-------------------------------------------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+Hilfreiche Quellen
+https://wiki.ubuntuusers.de/fdisk/
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
